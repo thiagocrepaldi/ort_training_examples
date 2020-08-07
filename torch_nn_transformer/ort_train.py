@@ -64,7 +64,8 @@ def transformer_model_description():
     input_desc = IODescription('input1', [bptt, batch_size], torch.float32)
     label_desc = IODescription('label', [bptt, batch_size, ntokens], torch.int64)
     loss_desc = IODescription('loss', [], torch.float32)
-    return ModelDescription([input_desc, label_desc], [loss_desc]), IODescription('Learning_Rate', [lr,], torch.float32)
+    pred_desc = IODescription('predictions', [35, 20, 28785], torch.float32)
+    return ModelDescription([input_desc, label_desc], [loss_desc, pred_desc]), IODescription('Learning_Rate', [lr,], torch.float32)
 model_desc, lr_desc = transformer_model_description()
 
 trainer = ORTTrainer(model, my_loss, model_desc, "LambOptimizer", None, lr_desc, device)
@@ -82,7 +83,7 @@ def train(lr, trainer, data_source, device, epoch):
             print(f"len(data)={len(data)} < {bptt}")
             continue
         learning_rate = torch.tensor([lr])
-        loss = trainer.train_step(data, targets, learning_rate)
+        loss, pred = trainer.train_step(data, targets, learning_rate)
         # import pdb; pdb.set_trace()
         total_loss += loss.item()
         log_interval = 200
@@ -107,7 +108,7 @@ def evaluate(trainer, data_source):
                 print(f"len(data)={len(data)} < {bptt}")
                 continue
             # import pdb; pdb.set_trace()
-            loss = trainer.eval_step(data, targets)
+            loss, pred = trainer.eval_step(data, targets)
             total_loss += len(data) * loss.item()
     return total_loss / (len(data_source) - 1)
 
