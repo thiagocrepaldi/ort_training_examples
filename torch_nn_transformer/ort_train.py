@@ -60,18 +60,26 @@ def my_loss(x, target):
     x = x.view(-1, 28785) #thiagofc: hard-coded for testing
     return nn.CrossEntropyLoss()(x, target)
 
+def transformer_model_description_dyn():
+    input_desc = IODescription('input1', ['bptt',  'batch_size'])
+    label_desc = IODescription('label', ['bptt', 'batch_size', ntokens])
+    loss_desc = IODescription('loss', [])
+    pred_desc = IODescription('predictions', ['bptt', 'batch_size', ntokens])
+    return ModelDescription([input_desc, label_desc], [loss_desc, pred_desc]), IODescription('Learning_Rate', [1])
+
 def transformer_model_description():
-    input_desc = IODescription('input1', [bptt, batch_size], torch.float32)
-    label_desc = IODescription('label', [bptt, batch_size, ntokens], torch.int64)
-    loss_desc = IODescription('loss', [], torch.float32)
-    pred_desc = IODescription('predictions', [35, 20, 28785], torch.float32)
-    return ModelDescription([input_desc, label_desc], [loss_desc, pred_desc]), IODescription('Learning_Rate', [lr,], torch.float32)
+    input_desc = IODescription('input1', [bptt, batch_size])
+    label_desc = IODescription('label', [bptt, batch_size, ntokens])
+    loss_desc = IODescription('loss', [])
+    pred_desc = IODescription('predictions', [bptt, batch_size, ntokens])
+    return ModelDescription([input_desc, label_desc], [loss_desc, pred_desc]), IODescription('Learning_Rate', [1])
 model_desc, lr_desc = transformer_model_description()
 
 trainer = ORTTrainer(model, my_loss, model_desc, "LambOptimizer", None, lr_desc, device)
 
 import time
 def train(lr, trainer, data_source, device, epoch):
+    bptt=35
     total_loss = 0.
     start_time = time.time()
     for batch, i in enumerate(range(0, data_source.size(0) - 1, bptt)):
