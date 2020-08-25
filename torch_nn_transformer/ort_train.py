@@ -37,7 +37,6 @@ test_data = batchify(test_txt, eval_batch_size)
 # Functions to generate input and target sequence
 bptt = 35
 def get_batch(source, i):
-    # import pdb; pdb.set_trace()
     seq_len = min(bptt, len(source) - 1 - i)
     data = source[i:i+seq_len]
     target = source[i+1:i+1+seq_len].view(-1)
@@ -60,21 +59,14 @@ def my_loss(x, target):
     x = x.view(-1, 28785) #thiagofc: hard-coded for testing
     return nn.CrossEntropyLoss()(x, target)
 
-def transformer_model_description_dyn():
-    input_desc = IODescription('input1', ['bptt',  'batch_size'])
-    label_desc = IODescription('label', ['bptt', 'batch_size', ntokens])
-    loss_desc = IODescription('loss', [])
-    pred_desc = IODescription('predictions', ['bptt', 'batch_size', ntokens])
-    return ModelDescription([input_desc, label_desc], [loss_desc, pred_desc]), IODescription('Learning_Rate', [1])
-
 def transformer_model_description():
-    input_desc = IODescription('input1', [bptt, batch_size])
-    label_desc = IODescription('label', [bptt, batch_size, ntokens])
-    loss_desc = IODescription('loss', [])
-    pred_desc = IODescription('predictions', [bptt, batch_size, ntokens])
-    return ModelDescription([input_desc, label_desc], [loss_desc, pred_desc]), IODescription('Learning_Rate', [1])
-model_desc, lr_desc = transformer_model_description()
+    input_desc = IODescription('input1', ['bptt', 'batch'], torch.float32)
+    label_desc = IODescription('label', ['bptt_x_batch', ntokens], torch.int64)
+    loss_desc = IODescription('loss', [], torch.float32)
+    pred_desc = IODescription('predictions', ['bptt', 'batch', ntokens], torch.float32)
+    return ModelDescription([input_desc, label_desc], [loss_desc, pred_desc]), IODescription('Learning_Rate', [lr,], torch.float32)
 
+model_desc, lr_desc = transformer_model_description()
 trainer = ORTTrainer(model, my_loss, model_desc, "LambOptimizer", None, lr_desc, device)
 
 import time
@@ -84,15 +76,8 @@ def train(lr, trainer, data_source, device, epoch):
     start_time = time.time()
     for batch, i in enumerate(range(0, data_source.size(0) - 1, bptt)):
         data, targets = get_batch(data_source, i)
-        # print(data.shape)
-        # print(targets.shape)
-        # import pdb; pdb.set_trace()
-        if len(data) < bptt:
-            print(f"len(data)={len(data)} < {bptt}")
-            continue
         learning_rate = torch.tensor([lr])
         loss, pred = trainer.train_step(data, targets, learning_rate)
-        # import pdb; pdb.set_trace()
         total_loss += loss.item()
         log_interval = 200
         if batch % log_interval == 0 and batch > 0:
@@ -112,10 +97,6 @@ def evaluate(trainer, data_source):
     with torch.no_grad():
         for i in range(0, data_source.size(0) - 1, bptt):
             data, targets = get_batch(data_source, i)
-            if len(data) < bptt:
-                print(f"len(data)={len(data)} < {bptt}")
-                continue
-            # import pdb; pdb.set_trace()
             loss, pred = trainer.eval_step(data, targets)
             total_loss += len(data) * loss.item()
     return total_loss / (len(data_source) - 1)
